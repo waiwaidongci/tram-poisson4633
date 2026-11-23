@@ -14,6 +14,15 @@ def checksum(rows):
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def superseded_ids(db):
+    """Dataset ids replaced by a newer correction batch imported under the same name."""
+    pairs = db.execute(select(Dataset.id, Dataset.name)).all()
+    latest = {}
+    for dataset_id, name in pairs:
+        latest[name] = max(latest.get(name, 0), dataset_id)
+    return {dataset_id for dataset_id, name in pairs if dataset_id < latest[name]}
+
+
 def save(db, name, filename, rows, actor):
     signature = checksum(rows)
     lookup = select(Dataset).where(Dataset.name == name, Dataset.checksum == signature)
@@ -40,5 +49,6 @@ def template():
     writer = csv.DictWriter(buffer, fieldnames=fields, extrasaction='ignore')
     writer.writeheader()
     # The complete representative dataset also works as a reproducible import fixture.
-    writer.writerows(demo_rows())
+    writer.writerows({key: ('\u662f' if value is True else '\u5426' if value is False else value)
+                      for key, value in row.items()} for row in demo_rows())
     return '\ufeff' + buffer.getvalue()

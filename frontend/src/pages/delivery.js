@@ -14,6 +14,7 @@ export async function deliveryPage(route, refresh) {
   const artifacts = table([
     {label:'报告', render:row=>link(row.name,`#results/${row.id}`)},
     {label:'复核', render:row=>pill(REVIEW[row.review],row.review)},
+    {label:'批次', render:row=>row.superseded ? pill('已撤下','blocked') : '现行'},
     {label:'计算时间', render:row=>date(row.finished_at)},
     {label:'下载', render:row=>{
       const download = button('下载 CSV',{class:'quiet'});

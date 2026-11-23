@@ -1,6 +1,6 @@
 from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from src.config.database import connection
 from src.constants.enums import Role
@@ -10,7 +10,7 @@ from src.models.identity import User
 from src.models.source import Dataset
 from src.schemas.requests import Upload
 from src.services.audit import record
-from src.services.datasets import save, template
+from src.services.datasets import save, superseded_ids, template
 from src.services.validation import parse_rows
 from src.utils import views
 
@@ -31,7 +31,9 @@ def sample(actor: User = Depends(current)):
 
 @router.get('/datasets')
 def datasets(db: Session = Depends(connection), actor: User = Depends(current)):
-    return [views.dataset(item) for item in db.scalars(select(Dataset).order_by(Dataset.id.desc()).limit(100))]
+    replaced = superseded_ids(db)
+    return [{**views.dataset(item), 'superseded': item.id in replaced}
+            for item in db.scalars(select(Dataset).order_by(Dataset.id.desc()).limit(100))]
 
 
 @router.get('/datasets/{dataset_id}')
@@ -40,7 +42,8 @@ def details(dataset_id: int, offset: int = Query(0, ge=0), limit: int = Query(16
     item = db.get(Dataset, dataset_id)
     if not item:
         raise HTTPException(404, '找不到该数据批次')
-    return {**views.dataset(item), 'rows': item.rows[offset:offset + limit]}
+    return {**views.dataset(item), 'superseded': item.id in superseded_ids(db),
+            'rows': item.rows[offset:offset + limit]}
 
 
 @router.post('/datasets', status_code=201)
@@ -49,6 +52,8 @@ def upload(body: Upload, db: Session = Depends(connection),
     rows = parse_rows(body.csv_text)
     item, created = save(db, body.name, body.filename, rows, actor.username)
     if created:
-        record(db, actor.username, 'dataset.imported', item.id, rows=item.row_count)
+        replaced = db.scalar(select(func.count()).select_from(Dataset)
+                             .where(Dataset.name == item.name, Dataset.id != item.id))
+        record(db, actor.username, 'dataset.imported', item.id, rows=item.row_count, superseded=replaced)
     db.commit()
     return {**views.dataset(item), 'created': created}

@@ -12,7 +12,7 @@ def cell(field, raw):
     if value is None or value == '':
         if field.get('required', True):
             raise ValueError(f'{label}不能为空')
-        return None
+        return False if kind == 'bool' else None
     try:
         if kind == 'int':
             if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):

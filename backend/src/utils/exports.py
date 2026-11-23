@@ -3,6 +3,8 @@ from src.config.settings import ARTIFACTS
 
 
 def safe_cell(value):
+    if isinstance(value, bool):
+        return '是' if value else '否'
     if isinstance(value, str) and (value.lstrip().startswith(('=', '+', '-', '@'))
                                    or value.startswith(('\t', '\r', '\n'))):
         return "'" + value

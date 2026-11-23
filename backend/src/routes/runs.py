@@ -12,6 +12,7 @@ from src.models.jobs import Run
 from src.models.source import Dataset
 from src.schemas.requests import ReviewRequest, RunRequest
 from src.services.audit import record
+from src.services.datasets import superseded_ids
 from src.services.validation import normalize_params
 from src.utils import views
 from src.utils.wakeup import wake
@@ -28,7 +29,9 @@ def require_job(db, run_id, lock=False):
 
 @router.get('')
 def index(db: Session = Depends(connection), actor: User = Depends(current)):
-    return [views.run(item) for item in db.scalars(select(Run).order_by(Run.id.desc()).limit(100))]
+    replaced = superseded_ids(db)
+    return [{**views.run(item), 'superseded': item.dataset_id in replaced}
+            for item in db.scalars(select(Run).order_by(Run.id.desc()).limit(100))]
 
 
 @router.post('', status_code=202)
@@ -36,6 +39,8 @@ def create(body: RunRequest, db: Session = Depends(connection),
            actor: User = Depends(allow(Role.ADMIN, Role.ANALYST))):
     if not db.get(Dataset, body.dataset_id):
         raise HTTPException(404, '找不到指定的数据批次')
+    if body.dataset_id in superseded_ids(db):
+        raise ValueError('该数据批次已有更正版本，旧比较已撤下。请改用更正后的批次重算全部留出窗。')
     item = Run(name=body.name, dataset_id=body.dataset_id, params=normalize_params(body.params), author=actor.username)
     db.add(item)
     db.flush()
@@ -47,7 +52,8 @@ def create(body: RunRequest, db: Session = Depends(connection),
 
 @router.get('/{run_id}')
 def detail(run_id: int, db: Session = Depends(connection), actor: User = Depends(current)):
-    return views.run(require_job(db, run_id), detail=True)
+    item = require_job(db, run_id)
+    return {**views.run(item, detail=True), 'superseded': item.dataset_id in superseded_ids(db)}
 
 
 @router.get('/{run_id}/export')
@@ -65,6 +71,8 @@ def export(run_id: int, db: Session = Depends(connection), actor: User = Depends
 def review(run_id: int, body: ReviewRequest, db: Session = Depends(connection),
            actor: User = Depends(allow(Role.ADMIN))):
     item = require_job(db, run_id, lock=True)
+    if item.dataset_id in superseded_ids(db):
+        raise HTTPException(409, '该运行的数据批次已有更正版本，比较结果已撤下。请用更正后的批次重算全部留出窗，再提交排班复核。')
     if item.status != Status.COMPLETE or item.review != Review.PENDING:
         raise HTTPException(409, '只有已完成且待复核的记录可以提交决定')
     if body.review == Review.PENDING:

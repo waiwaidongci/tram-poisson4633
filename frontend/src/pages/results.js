@@ -33,7 +33,8 @@ export async function results(route, refresh) {
   const result = job.result;
   const analysis = result ? el('section',{class:'analysis','data-testid':'analysis-complete'},
     el('div',{class:'result-head'},p(job.name,'eyeline'),h(2,result.headline),p(result.note,'intro-copy'),
-      el('div',{class:'actions'},pill(STATUS[job.status],job.status),download,message)),
+      job.superseded && p('数据批次已有更正版本，此比较已撤下。请用更正后的批次重算全部留出窗，再提交排班复核。','feedback'),
+      el('div',{class:'actions'},pill(STATUS[job.status],job.status),job.superseded && pill('已撤下','blocked'),download,message)),
     metrics(result.metrics),
     result.charts.map(plot),
     (result.sections || []).map(item=>panel(item.title,p(item.text))),
@@ -44,6 +45,6 @@ export async function results(route, refresh) {
     el('aside',{class:'sidebar-panel'},panel('运行来源',history,
       source && link(source.name,`#inputs/${source.id}`),p(date(job.finished_at),'subtle'),
       el('dl',{class:'dictionary'},inputs)),
-    result && panel(spec.decision, pill(REVIEW[job.review],job.review),
+    result && panel(spec.decision, job.superseded && pill('已撤下','blocked'), pill(REVIEW[job.review],job.review),
       link('打开复核记录',`#review/${job.id}`,{class:'quiet'})))));
 }

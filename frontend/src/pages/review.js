@@ -33,7 +33,9 @@ export async function reviewPage(route, refresh) {
       link('查看计算证据',`#results/${id}`,{class:'quiet'}),
       pill(REVIEW[job.review],job.review),
       job.review_note && el('div',{class:'decision'},p(job.decision),p(job.review_note)),
-      job.review === 'pending' && (session.canReview ? reviewForm(job,spec,refresh) : p('等待业务负责人复核。','subtle'))),
+      job.superseded && p('数据批次已有更正版本，此比较已撤下。请用更正后的批次重算全部留出窗，再提交排班复核。','feedback'),
+      job.review === 'pending' && !job.superseded && (session.canReview ? reviewForm(job,spec,refresh) : p('等待业务负责人复核。','subtle'))),
     panel('可复核记录', el('ul',{class:'method-list'}, completed.map(run =>
-      el('li',{}, link(run.name,`#review/${run.id}`), ' ', pill(REVIEW[run.review],run.review))))));
+      el('li',{}, link(run.name,`#review/${run.id}`), ' ', pill(REVIEW[run.review],run.review),
+        run.superseded && [' ', pill('已撤下','blocked')])))));
 }

@@ -20,6 +20,7 @@ export async function inputs(route, refresh) {
       datasets.map(item=>el('option',{value:item.id,selected:item.id === selected.id}, item.name))),
     link('使用此批次运行',`#run/${detail.id}`,{class:'quiet'})),
     p(`${detail.filename} · ${detail.row_count} 行 · ${date(detail.created_at)}`,'filename'),
+    detail.superseded && p('该批次已有更正版本，基于它的比较已撤下，请改用最新批次。','feedback'),
     table(columns,detail.rows,{caption:'批次明细',pageSize:16}),
     el('div',{class:'pagination'},
       route.offset > 0 && link('上一批明细',`#inputs/${detail.id}/${Math.max(0,route.offset-16)}`,{class:'quiet'}),
@@ -41,5 +42,6 @@ export async function inputs(route, refresh) {
   return el('div',{class:'two-col'},el('div',{class:'wide-panel'},preview),el('aside',{class:'sidebar-panel'},
     panel('数据导入',p('导入后保留原批次和校验指纹，可用同一份数据复跑。','subtle'),sample,upload,error),
     panel('字段说明',el('dl',{class:'dictionary'},spec.fields.map(item=>el('div',{},el('dt',{},item.label),
-      el('dd',{},item.key,item.required === false ? ' · 可空' : ' · 必填',item.options ? ` · ${item.options.join(' / ')}` : '')))))));
+      el('dd',{},item.key,item.required === false ? ' · 可空' : ' · 必填',
+        item.options ? ` · ${item.options.join(' / ')}` : item.type === 'bool' ? ' · 是 / 否' : '')))))));
 }

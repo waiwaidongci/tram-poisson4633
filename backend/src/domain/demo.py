@@ -12,6 +12,19 @@ _INTERSECTIONS = (
     ("科创大道", "东环街口", "独立通行"),
 )
 
+# Counter cap: once the on-duty counter tops out, the ledger reports the cap as
+# a lower bound. The signal station keeps its own capped record for matching.
+_CAP = 9
+_CAPPED_WINDOWS = {
+    ("2026-11-10", "港湾路", "货栈街口", "高峰"),
+    ("2026-11-14", "科创大道", "智造街口", "高峰"),
+    ("2026-11-19", "港湾路", "渡口街口", "高峰"),
+}
+# Capped on our side but missing from the signal station record: set aside.
+_UNMATCHED_WINDOWS = {
+    ("2026-11-20", "科创大道", "东环街口", "平峰"),
+}
+
 
 def _poisson(rng, mean):
     limit = exp(-mean)
@@ -38,4 +51,10 @@ def demo_rows():
                     "shift": shift, "track": track, "exposure": exposure,
                     "count": _poisson(rng, exposure * rate),
                 })
+    for row in rows:
+        key = (row["date"], row["road"], row["intersection"], row["shift"])
+        row["capped"] = key in _CAPPED_WINDOWS or key in _UNMATCHED_WINDOWS
+        row["signal_capped"] = key in _CAPPED_WINDOWS
+        if row["capped"]:
+            row["count"] = _CAP
     return rows
